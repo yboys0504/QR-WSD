@@ -32,4 +32,29 @@ Data imbalance, also known as the long-tailed distribution of data, is very comm
 <b>main.py</b> is the entry file of the model, that is, the main class.
 
 
+## Dependencies 
+To run this code, you'll need the following libraries:
+* [Python 3](https://www.python.org/)
+* [Pytorch 1.2.0](https://pytorch.org/)
+* [Transformers 1.1.0](https://github.com/huggingface/transformers)
+* [Numpy 1.17.2](https://numpy.org/)
+* [NLTK 3.4.5](https://www.nltk.org/)
+* [tqdm](https://tqdm.github.io/)
+
+We used the [WSD Evaluation Framework](http://lcl.uniroma1.it/wsdeval/) for training and evaluating our model.
+
+
+## How to Run 
+To train a biencoder model, run `python biencoder.py --data-path $path_to_wsd_data --ckpt $path_to_checkpoint`. The required arguments are: `--data-path`, which is the filepath to the top-level directory of the WSD Evaluation Framework; and `--ckpt`, which is the filepath of the directory to which to save the trained model checkpoints and prediction files. The `Scorer.java` in the WSD Framework data files needs to be compiled, with the `Scorer.class` file in the original directory of the Scorer file.
+
+It is recommended you train this model using the `--multigpu` flag to enable model parallel (note that this requires two available GPUs). More hyperparameter options are available as arguments; run `python biencoder.py -h` for all possible arguments.
+
+To evaluate an existing biencoder, run `python biencoder.py --data-path $path_to_wsd_data --ckpt $path_to_model_checkpoint --eval --split $wsd_eval_set`. Without `--split`, this defaults to evaluating on the development set, semeval2007. The model weights and predictions for the biencoder reported in the paper can be found [here](https://drive.google.com/file/d/1NZX_eMHQfRHhJnoJwEx2GnbnYIQepIQj).
+
+Similar commands can be used to run the frozen probe for WSD (`frozen_pretrained_encoder.py`) and the finetuning a pretrained, single encoder classifier for WSD (`finetune_pretrained_encoder.py`).
+
+
+
+
+
 
