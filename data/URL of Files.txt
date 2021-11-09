@@ -1,0 +1,5 @@
+SemCor: http://lcl.uniroma1.it/wsdeval/training-data
+
+OMSTI: http://lcl.uniroma1.it/wsdeval/training-data
+
+Multilingual datasets: https://github.com/SapienzaNLP/mwsd-datasets
