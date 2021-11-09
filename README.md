@@ -9,3 +9,19 @@ Data imbalance, also known as the long-tailed distribution of data, is very comm
 <img src="https://github.com/yboys0504/QR-WSD/blob/main/chart.png">
 
 
+## File And Folder Description
+<b>data:</b> The data folder contains the training datasets. Due to github's restrictions on uploading files, here we give the link address of the datasets.
+---<b>SemCor:</b> <a href="http://lcl.uniroma1.it/wsdeval/training-data">http://lcl.uniroma1.it/wsdeval/training-data</a>
+---<b>OMSTI:</b> <a href="http://lcl.uniroma1.it/wsdeval/training-data">http://lcl.uniroma1.it/wsdeval/training-data</a>
+---<b>Multilingual datasets:</b> <a href="https://github.com/SapienzaNLP/mwsd-datasets">https://github.com/SapienzaNLP/mwsd-datasets</a>
+
+<b>ckpt:</b> The ckpt folder contains the pre-training code for the model.
+
+<b>wsd_models:</b> The wsd_models folder contains two files, namely util.py and models.py.
+---<b>util.py</b> contains the tool functions required by the main.py file; 
+---<b>models.py</b> is the definition file of the model.
+
+<b>main.py</b> is the entry file of the model, that is, the main class.
+
+
+
