@@ -25,7 +25,7 @@ parser.add_argument('--grad-norm', type=float, default=1.0)
 parser.add_argument('--silent', action='store_true',
 	help='Flag to supress training progress bar for each epoch')
 parser.add_argument('--multigpu', action='store_true')
-parser.add_argument('--lr', type=float, default=0.00001) #0.00001
+parser.add_argument('--lr', type=float, default=0.00001) #0.00001 0.000005
 parser.add_argument('--warmup', type=int, default=10000)
 parser.add_argument('--context-max-length', type=int, default=128)
 parser.add_argument('--gloss-max-length', type=int, default=32)
@@ -275,7 +275,6 @@ def load_and_preprocess_glosses(data, tokenizer, wn_senses, max_len=-1):
 				continue #ignore unlabeled words
 			else:
 				key = generate_key(lemma, pos)
-
 				if key not in sense_glosses:
 					#get all sensekeys for the lemma/pos pair
 					sensekey_arr = wn_senses[key]
@@ -404,18 +403,15 @@ def _train(train_data, model, linear, train_gloss_dict, optim, schedule, criteri
 		model.zero_grad()
 		
 		'''run example sentence(s) through context encoder'''
-		#if multigpu:
-		#	context_ids = context_ids.to(context_device)
-		#	context_attn_mask = context_attn_mask.to(context_device)
-		#	context_output_mask = context_output_mask.to(context_device)
-		#else:
-		#	context_ids = context_ids.cuda()
-		#	context_attn_mask = context_attn_mask.cuda()
-		#	context_output_mask = context_output_mask.cuda()
+		if multigpu:
+			context_ids = context_ids.to(context_device)
+			context_attn_mask = context_attn_mask.to(context_device)
+			context_output_mask = context_output_mask.to(context_device)
+		else:
+			context_ids = context_ids.cuda()
+			context_attn_mask = context_attn_mask.cuda()
+			context_output_mask = context_output_mask.cuda()
 		context_output = model.context_forward(context_ids, context_attn_mask, context_output_mask)
-		
-
-
 
 
 		loss, gloss_sz, context_sz = 0., 0, len(labels)
@@ -423,8 +419,6 @@ def _train(train_data, model, linear, train_gloss_dict, optim, schedule, criteri
 
 			output = context_output.split(1,dim=0)[j]
 
-
-			
 
 			"""Added by Junwei Zhang in 20210930"""
 			output1 = output / torch.sqrt(torch.sum(torch.mul(output, output), 1)).squeeze()
@@ -434,23 +428,20 @@ def _train(train_data, model, linear, train_gloss_dict, optim, schedule, criteri
 
 			output_quantum = output1 * torch.cos(PA) + output2 * torch.sin(PA)
 
-
-
 		
 
 
 			'''run example's glosses through gloss encoder'''
 			gloss_ids, gloss_attn_mask, sense_keys = train_gloss_dict[key]
 		
-			#if multigpu:
-			#	gloss_ids = gloss_ids.to(gloss_device)
-			#	gloss_attn_mask = gloss_attn_mask.to(gloss_device)
-			#else:
-			#	gloss_ids = gloss_ids.cuda()
-			#	gloss_attn_mask = gloss_attn_mask.cuda()
+			if multigpu:
+				gloss_ids = gloss_ids.to(gloss_device)
+				gloss_attn_mask = gloss_attn_mask.to(gloss_device)
+			else:
+				gloss_ids = gloss_ids.cuda()
+				gloss_attn_mask = gloss_attn_mask.cuda()
 			gloss_output = model.gloss_forward(gloss_ids, gloss_attn_mask, None)
 			gloss_output = gloss_output.transpose(0,1)
-
 
 
 			"""Added by Junwei Zhang in 20210930"""
@@ -463,42 +454,47 @@ def _train(train_data, model, linear, train_gloss_dict, optim, schedule, criteri
 
 			'''Added by Junwei Zhang'''
 			example_ids, exmaple_attn_mask, example_outp_mask, _ = train_example_dict[key]
-			#if multigpu:
-			#	example_ids = example_ids.to(context_device)
-			#	exmaple_attn_mask = exmaple_attn_mask.to(context_device)
-			#	example_outp_mask = example_outp_mask.to(context_device)
-			#else:
-			#	example_ids = example_ids.cuda()
-			#	exmaple_attn_mask = exmaple_attn_mask.cuda()
-			#	example_outp_mask = example_outp_mask.cuda()
+			if multigpu:
+				example_ids = example_ids.to(context_device)
+				exmaple_attn_mask = exmaple_attn_mask.to(context_device)
+				example_outp_mask = example_outp_mask.to(context_device)
+			else:
+				example_ids = example_ids.cuda()
+				exmaple_attn_mask = exmaple_attn_mask.cuda()
+				example_outp_mask = example_outp_mask.cuda()
 			example_output = model.context_forward(example_ids, exmaple_attn_mask, example_outp_mask, flag=True)
 			example_output = example_output.transpose(0,1)
-
-
 
 			"""Added by Junwei Zhang in 20210930"""
 			example_output_quantum = example_output / torch.sqrt(torch.sum(torch.mul(example_output, example_output), 0)).unsqueeze(0)
 
 
 
+
+
+
+
+
+			'''get cosine sim of example from context encoder with gloss embeddings'''
 			#if multigpu:
-			#	gloss_output = gloss_output.to(gloss_device)
-			#	example_output = example_output.to(gloss_device)
-			#	output = output.to(gloss_device)
-			#	gloss_output_quantum = gloss_output_quantum.to(gloss_device)
-			#	example_output_quantum = example_output_quantum.to(gloss_device)
-			#	output_quantum = output_quantum.to(gloss_device)
+			#	output = output.cpu()
+			#	gloss_output = gloss_output.cpu()
+			#	example_output = example_output.cpu()
+			if multigpu:
+				gloss_output = gloss_output.to(gloss_device)
+				example_output = example_output.to(gloss_device)
+				output = output.to(gloss_device)
+				gloss_output_quantum = gloss_output_quantum.to(gloss_device)
+				example_output_quantum = example_output_quantum.to(gloss_device)
+				output_quantum = output_quantum.to(gloss_device)
 				
-			#else:
-			#	gloss_output = gloss_output.cuda()
-			#	example_output = example_output.cuda()
-			#	output = output.cuda()
-			#	gloss_output_quantum = gloss_output_quantum.cuda()
-			#	example_output_quantum = example_output_quantum.cuda()
-			#	output_quantum = output_quantum.cuda()
-				
-
-
+			else:
+				gloss_output = gloss_output.cuda()
+				example_output = example_output.cuda()
+				output = output.cuda()
+				gloss_output_quantum = gloss_output_quantum.cuda()
+				example_output_quantum = example_output_quantum.cuda()
+				output_quantum = output_quantum.cuda()
 
 
 
@@ -513,6 +509,11 @@ def _train(train_data, model, linear, train_gloss_dict, optim, schedule, criteri
 			result = output_1 + output_2 + output_3 + output_4
 
 
+
+
+
+
+
 			
 
 			'''get label and calculate loss'''
@@ -520,14 +521,13 @@ def _train(train_data, model, linear, train_gloss_dict, optim, schedule, criteri
 			label_tensor = torch.tensor([idx])
 
 
+			if multigpu:
+				label_tensor = label_tensor.cuda()
+				result = result.cuda()
+			else:
+				label_tensor = label_tensor.cuda()
+				result = result.cuda()
 
-
-			#if multigpu:
-			#	label_tensor = label_tensor.cuda()
-			#	result = result.cuda()
-			#else:
-			#	label_tensor = label_tensor.cuda()
-			#	result = result.cuda()
 
 
 
@@ -582,24 +582,20 @@ def _eval(eval_data, model, linear, gloss_dict, example_dict, multigpu=False):
 	eval_preds = []
 	for context_ids, context_attn_mask, context_output_mask, example_keys, insts, _ in eval_data:
 		with torch.no_grad(): 
-
-
 			'''run example through model'''
 			if multigpu:
-				context_ids         = context_ids.to(context_device)
-				context_attn_mask   = context_attn_mask.to(context_device)
+				context_ids = context_ids.to(context_device)
+				context_attn_mask = context_attn_mask.to(context_device)
 				context_output_mask = context_output_mask.to(context_device)
 			else:
-				context_ids         = context_ids.cuda()
-				context_attn_mask   = context_attn_mask.cuda()
+				context_ids = context_ids.cuda()
+				context_attn_mask = context_attn_mask.cuda()
 				context_output_mask = context_output_mask.cuda()
-
 			context_output = model.context_forward(context_ids, context_attn_mask, context_output_mask)
 
 
-
-
 			for output, key, inst in zip(context_output.split(1,dim=0), example_keys, insts):
+
 
 
 				"""Added by Junwei Zhang in 20210930"""
@@ -613,6 +609,9 @@ def _eval(eval_data, model, linear, gloss_dict, example_dict, multigpu=False):
 
 
 
+
+
+
 				'''run example's glosses through gloss encoder'''
 				gloss_ids, gloss_attn_mask, sense_keys = gloss_dict[key]
 
@@ -622,8 +621,6 @@ def _eval(eval_data, model, linear, gloss_dict, example_dict, multigpu=False):
 				else:
 					gloss_ids = gloss_ids.cuda()
 					gloss_attn_mask = gloss_attn_mask.cuda()
-
-
 				gloss_output = model.gloss_forward(gloss_ids, gloss_attn_mask, None)
 				gloss_output = gloss_output.transpose(0,1)
 
@@ -649,23 +646,30 @@ def _eval(eval_data, model, linear, gloss_dict, example_dict, multigpu=False):
 				example_output_quantum = example_output / torch.sqrt(torch.sum(torch.mul(example_output, example_output), 0)).unsqueeze(0)
 
 
+
+
+
+
+
+				#get cosine sim of example from context encoder with gloss embeddings
 				#if multigpu:
-				#	gloss_output   = gloss_output.to(gloss_device)
-				#	example_output = example_output.to(gloss_device)
-				#	output         = output.to(gloss_device)
-				#	gloss_output_quantum   = gloss_output_quantum.to(gloss_device)
-				#	example_output_quantum = example_output_quantum.to(gloss_device)
-				#	output_quantum         = output_quantum.to(gloss_device)
-				#else:
-				#	gloss_output   = gloss_output.cuda()
-				#	example_output = example_output.cuda()
-				#	output         = output.cuda()
-				#	gloss_output_quantum   = gloss_output_quantum.cuda()
-				#	example_output_quantum = example_output_quantum.cuda()
-				#	output_quantum         = output_quantum.cuda()
-
-
-
+				#	output = output.cpu()
+				#	gloss_output   = gloss_output.cpu()
+				#	example_output = example_output.cpu()
+				if multigpu:
+					gloss_output   = gloss_output.to(gloss_device)
+					example_output = example_output.to(gloss_device)
+					output         = output.to(gloss_device)
+					gloss_output_quantum   = gloss_output_quantum.to(gloss_device)
+					example_output_quantum = example_output_quantum.to(gloss_device)
+					output_quantum         = output_quantum.to(gloss_device)
+				else:
+					gloss_output   = gloss_output.cuda()
+					example_output = example_output.cuda()
+					output         = output.cuda()
+					gloss_output_quantum   = gloss_output_quantum.cuda()
+					example_output_quantum = example_output_quantum.cuda()
+					output_quantum         = output_quantum.cuda()
 
 
 
@@ -676,8 +680,6 @@ def _eval(eval_data, model, linear, gloss_dict, example_dict, multigpu=False):
 				output_3 = torch.mm(output_quantum, gloss_output_quantum)
 				output_4 = torch.mm(output_quantum, example_output_quantum)
 				result   = output_1 + output_2 + output_3 + output_4
-
-
 
 
 				pred_idx = result.topk(1, dim=-1)[1].squeeze().item()
@@ -692,7 +694,7 @@ def _eval(eval_data, model, linear, gloss_dict, example_dict, multigpu=False):
 
 def train_model(args):
 
-	print('Training WSD model...')
+	print('Training WSD bi-encoder model...')
 
 	'''no gloss bsz if not training gloss encoder, memory concerns'''
 	if args.freeze_gloss: assert args.gloss_bsz == -1 
@@ -758,28 +760,33 @@ def train_model(args):
 
 
 	''' SET UP FINETUNING MODEL, OPTIMIZER, AND LR SCHEDULE'''
-	model  = BiEncoderModel(args.encoder_name, freeze_gloss=args.freeze_gloss, freeze_context=args.freeze_context, tie_encoders=args.tie_encoders)
-	linear = torch.nn.Linear(768, 1)
-
+	model = BiEncoderModel(args.encoder_name, freeze_gloss=args.freeze_gloss, freeze_context=args.freeze_context, tie_encoders=args.tie_encoders)
+	linear= torch.nn.Linear(768, 1)
 
 
 
 
 	
 	'''added by Junwei Zhang'''
-	#model_path = os.path.join(args.ckpt, 'best_model.ckpt')
-	#model.load_state_dict(torch.load(model_path))
-	#linear.load_state_dict(torch.load(model_path))
+	model_path = os.path.join(args.ckpt, 'best_model.ckpt')
+	model.load_state_dict(torch.load(model_path))
+	linear_path = os.path.join(args.ckpt, 'linear_model.ckpt')
+	linear.load_state_dict(torch.load(linear_path))
+
+
 
 
 	'''speeding up training by putting two encoders on seperate gpus (instead of data parallel)'''
-	#if args.multigpu: 
-	#	model.gloss_encoder = model.gloss_encoder.to(gloss_device)
-	#	model.context_encoder = model.context_encoder.to(context_device)
-	#	linear = linear.to(context_device)
-	#else:
-	#	model = model.cuda()
-	#	linear = linear.cuda()
+	if args.multigpu: 
+		model.gloss_encoder = model.gloss_encoder.to(gloss_device)
+		model.context_encoder = model.context_encoder.to(context_device)
+		linear = linear.to(context_device)
+	else:
+		model = model.cuda()
+		linear = linear.cuda()
+
+
+
 
 
 	criterion = {}
@@ -839,18 +846,15 @@ def train_model(args):
 			best_dev_f1 = dev_f1
 			'''save to file if best probe so far on dev set'''
 			model_fname = os.path.join(args.ckpt, 'best_model.ckpt')
+			linear_fname = os.path.join(args.ckpt, 'linear_model.ckpt')
 			with open(model_fname, 'wb') as f:
 				torch.save(model.state_dict(), f)
+			with open(linear_fname, 'wb') as f:
 				torch.save(linear.state_dict(), f)
 			sys.stdout.flush()
 
 		'''shuffle train set ordering after every epoch'''
 		random.shuffle(train_data)
-
-		'''clearing cuda added by Junwei Zhang'''
-		#gc.collect()
-		#torch.cuda.empty_cache()
-
 	return
 
 
@@ -862,15 +866,18 @@ def evaluate_model(args):
 	LOAD TRAINED MODEL
 	'''
 	model = BiEncoderModel(args.encoder_name, freeze_gloss=args.freeze_gloss, freeze_context=args.freeze_context)
-	linear = torch.nn.Linear(768, 1)
+	linear= torch.nn.Linear(768, 1)
+
 
 	model_path = os.path.join(args.ckpt, 'best_model.ckpt')
+	linear_path = os.path.join(args.ckpt, 'linear_model.ckpt')
 	model.load_state_dict(torch.load(model_path))
-	linear.load_state_dict(torch.load(model_path))
+	linear.load_state_dict(torch.load(linear_path))
 
 
-	model  = model.cuda()
-	linear = linear.cuda()
+
+	model = model.cuda()
+	linear= linear.cuda()
 
 	
 
@@ -920,10 +927,13 @@ def evaluate_model(args):
 
 
 if __name__ == "__main__":
-	#if not torch.cuda.is_available():
-	#	print("Need available GPU(s) to run this model...")
-	#	quit()
+	if not torch.cuda.is_available():
+		print("Need available GPU(s) to run this model...")
+		quit()
 
+	'''clearing cuda added by Junwei Zhang'''
+	#gc.collect()
+	#torch.cuda.empty_cache()
 
 	'''parse args'''
 	args = parser.parse_args()
