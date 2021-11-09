@@ -52,8 +52,8 @@ It is recommended you train this model using the `--multigpu` flag to enable mod
 To evaluate an existing biencoder, run `python main.py --data-path $path_to_wsd_data --ckpt $path_to_model_checkpoint --eval --split $wsd_eval_set`. Without `--split`, this defaults to evaluating on the development set, semeval2007. 
 
 
-
-
+## Screenshot of model running process
+<img src="https://github.com/yboys0504/QR-WSD/blob/main/jt.png">
 
 
 
